@@ -1,0 +1,33 @@
+pipeline {
+    agent any
+    stages {
+        stage('Checkout') {
+            steps {
+                git credentialsId: 'github-creds',
+                    url: 'https://github.com/talashtests/cicd-k3s-demo.git'
+            }
+        }
+        stage('Validate Python') {
+            steps {
+                sh 'python3 -m py_compile app.py'
+            }
+        }
+        stage('Build Image') {
+            steps {
+                sh 'docker build -t ghcr.io/talashtests/cicd-k3s-demo:latest .'
+            }
+        }
+        stage('Login to GHCR') {
+            steps {
+                withCredentials([string(credentialsId: 'ghcr-token', variable: 'TOKEN')]) {
+                    sh 'echo $TOKEN | docker login ghcr.io -u talashtests --password-stdin'
+                }
+            }
+        }
+        stage('Push Image') {
+            steps {
+                sh 'docker push ghcr.io/talashtests/cicd-k3s-demo:latest'
+            }
+        }
+    }
+}
