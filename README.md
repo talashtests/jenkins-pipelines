@@ -1,2 +1,2 @@
 # jenkins-pipelines
-This branch contains CD PIPELINES
+This branch contains ONLY CD PIPELINES !!
