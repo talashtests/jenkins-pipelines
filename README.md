@@ -1,2 +1,2 @@
 # jenkins-pipelines
-This branch contains CI-CD PIPELINES
+This branch contains COMBINED CI-CD PIPELINES
