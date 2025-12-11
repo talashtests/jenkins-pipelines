@@ -4,7 +4,8 @@ pipeline {
         stage('Checkout') {
             steps {
                 git credentialsId: 'github-creds',
-                    url: 'https://github.com/talashtests/cicd-k3s-demo.git'
+                    url: 'https://github.com/talashtests/cicd-k3s-demo.git',
+                    branch: 'main'
             }
         }
         stage('Deploy to K3S') {
