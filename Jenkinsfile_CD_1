@@ -1,0 +1,19 @@
+pipeline {
+    agent any
+    stages {
+        stage('Checkout') {
+            steps {
+                git credentialsId: 'github-creds',
+                    url: 'https://github.com/talashtests/cicd-k3s-demo.git'
+            }
+        }
+        stage('Deploy to K3S') {
+            steps {
+                withKubeConfig([credentialsId: 'K3S-kubeconfig-master']) {
+                    sh 'kubectl apply -f deployment.yaml'
+                    sh 'kubectl apply -f service.yaml'
+                }
+            }
+        }
+    }
+}
