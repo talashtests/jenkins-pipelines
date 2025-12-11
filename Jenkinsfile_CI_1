@@ -5,6 +5,7 @@ pipeline {
             steps {
                 git credentialsId: 'github-creds',
                     url: 'https://github.com/talashtests/cicd-k3s-demo.git'
+                    branch: 'main'
             }
         }
         stage('Validate Python') {
