@@ -1,2 +1,2 @@
 # jenkins-pipelines
-This branch contains CI PIPELINES
+This branch contains ONLY CI PIPELINES !!
