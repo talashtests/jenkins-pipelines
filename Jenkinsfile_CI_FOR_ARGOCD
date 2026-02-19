@@ -8,23 +8,39 @@ pipeline {
 
     stages {
 
+        stage('Checkout Jenkinsfile Repo') {
+            steps {
+                // Checkout THIS repo (jenkins-pipelines, CI_JOB branch)
+                git credentialsId: 'github-creds',
+                    url: 'https://github.com/talashtests/jenkins-pipelines.git',
+                    branch: 'CI_JOB'
+            }
+        }
+
         stage('Checkout App Repo') {
             steps {
-                git credentialsId: 'github-creds',
-                    url: 'https://github.com/talashtests/cicd-k3s-demo.git',
-                    branch: 'main'
+                // Checkout the app repo (cicd-k3s-demo, main branch)
+                dir('app-repo') {
+                    git credentialsId: 'github-creds',
+                        url: 'https://github.com/talashtests/cicd-k3s-demo.git',
+                        branch: 'main'
+                }
             }
         }
 
         stage('Validate Python') {
             steps {
-                sh 'python3 -m py_compile app.py'
+                dir('app-repo') {
+                    sh 'python3 -m py_compile app.py'
+                }
             }
         }
 
         stage('Build Image') {
             steps {
-                sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} ."
+                dir('app-repo') {
+                    sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} ."
+                }
             }
         }
 
@@ -44,24 +60,36 @@ pipeline {
 
         stage('Update Deployment Manifest') {
             steps {
-                sh """
-                sed -i 's|image: ghcr.io/talashtests/cicd-k3s-demo:.*|image: ${IMAGE_NAME}:${IMAGE_TAG}|' deployment.yaml
-                """
+                dir('app-repo') {
+                    sh """
+                    sed -i 's|image: ghcr.io/talashtests/cicd-k3s-demo:.*|image: ${IMAGE_NAME}:${IMAGE_TAG}|' deployment.yaml
+                    """
+                }
             }
         }
 
         stage('Commit & Push to Deploy Branch') {
             steps {
-                withCredentials([string(credentialsId: 'github-personal-access-token-classic', variable: 'TOKEN')]) {
-                    sh """
-                        git config user.email "jenkins@local"
-                        git config user.name "jenkins"
+                dir('app-repo') {
+                    withCredentials([string(credentialsId: 'github-personal-access-token-classic', variable: 'TOKEN')]) {
+                        sh """
+                            git config user.email "jenkins@local"
+                            git config user.name "jenkins"
 
-                        git add deployment.yaml
-                        git commit -m "Update image to ${IMAGE_TAG} [skip ci]" || echo "No changes to commit"
+                            # Fetch latest deploy branch
+                            git fetch origin deploy
+                            git checkout deploy
 
-                        git push https://talashtests:${TOKEN}@github.com/talashtests/cicd-k3s-demo.git HEAD:deploy
-                    """
+                            # Copy updated deployment.yaml from main checkout
+                            cp deployment.yaml deployment.yaml  # already in app-repo directory
+
+                            git add deployment.yaml
+                            git commit -m "Update image to ${IMAGE_TAG} [skip ci]" || echo "No changes to commit"
+
+                            # Push to deploy branch
+                            git push https://talashtests:${TOKEN}@github.com/talashtests/cicd-k3s-demo.git deploy
+                        """
+                    }
                 }
             }
         }
