@@ -8,18 +8,8 @@ pipeline {
 
     stages {
 
-        stage('Checkout Jenkinsfile Repo') {
-            steps {
-                // Checkout THIS repo (jenkins-pipelines, CI_JOB branch)
-                git credentialsId: 'github-creds',
-                    url: 'https://github.com/talashtests/jenkins-pipelines.git',
-                    branch: 'CI_JOB'
-            }
-        }
-
         stage('Checkout App Repo') {
             steps {
-                // Checkout the app repo (cicd-k3s-demo, main branch)
                 git credentialsId: 'github-creds',
                     url: 'https://github.com/talashtests/cicd-k3s-demo.git',
                     branch: 'main'
@@ -60,7 +50,7 @@ pipeline {
             }
         }
 
-        stage('Commit and Push Deployment Update') {
+        stage('Commit & Push to Deploy Branch') {
             steps {
                 withCredentials([string(credentialsId: 'github-personal-access-token-classic', variable: 'TOKEN')]) {
                     sh """
