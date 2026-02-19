@@ -8,19 +8,9 @@ pipeline {
 
     stages {
 
-        stage('Checkout Jenkinsfile Repo') {
+        stage('Checkout App Repo (main)') {
             steps {
-                // Checkout THIS repo (jenkins-pipelines, CI_JOB branch)
-                git credentialsId: 'github-creds',
-                    url: 'https://github.com/talashtests/jenkins-pipelines.git',
-                    branch: 'CI_JOB'
-            }
-        }
-
-        stage('Checkout App Repo') {
-            steps {
-                // Checkout the app repo (cicd-k3s-demo, main branch)
-                dir('app-repo') {
+                dir('main-repo') {
                     git credentialsId: 'github-creds',
                         url: 'https://github.com/talashtests/cicd-k3s-demo.git',
                         branch: 'main'
@@ -30,7 +20,7 @@ pipeline {
 
         stage('Validate Python') {
             steps {
-                dir('app-repo') {
+                dir('main-repo') {
                     sh 'python3 -m py_compile app.py'
                 }
             }
@@ -38,7 +28,7 @@ pipeline {
 
         stage('Build Image') {
             steps {
-                dir('app-repo') {
+                dir('main-repo') {
                     sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} ."
                 }
             }
@@ -58,38 +48,41 @@ pipeline {
             }
         }
 
-        stage('Update Deployment Manifest') {
+        stage('Prepare Updated Manifest') {
             steps {
-                dir('app-repo') {
+                dir('main-repo') {
                     sh """
-                    sed -i 's|image: ghcr.io/talashtests/cicd-k3s-demo:.*|image: ${IMAGE_NAME}:${IMAGE_TAG}|' deployment.yaml
+                        sed -i 's|image: ghcr.io/talashtests/cicd-k3s-demo:.*|image: ${IMAGE_NAME}:${IMAGE_TAG}|' deployment.yaml
                     """
                 }
             }
         }
 
-        stage('Commit & Push to Deploy Branch') {
+        stage('Checkout Deploy Branch') {
             steps {
-                dir('app-repo') {
-                    withCredentials([string(credentialsId: 'github-personal-access-token-classic', variable: 'TOKEN')]) {
-                        sh """
-                            git config user.email "jenkins@local"
-                            git config user.name "jenkins"
+                dir('deploy-repo') {
+                    git credentialsId: 'github-creds',
+                        url: 'https://github.com/talashtests/cicd-k3s-demo.git',
+                        branch: 'deploy'
+                }
+            }
+        }
 
-                            # Fetch latest deploy branch
-                            git fetch origin deploy
-                            git checkout deploy
+        stage('Update Deploy Branch & Push') {
+            steps {
+                withCredentials([string(credentialsId: 'github-personal-access-token-classic', variable: 'TOKEN')]) {
+                    sh """
+                        cp main-repo/deployment.yaml deploy-repo/deployment.yaml
 
-                            # Copy updated deployment.yaml from main checkout
-                            cp deployment.yaml deployment.yaml  # already in app-repo directory
+                        cd deploy-repo
+                        git config user.email "jenkins@local"
+                        git config user.name "jenkins"
 
-                            git add deployment.yaml
-                            git commit -m "Update image to ${IMAGE_TAG} [skip ci]" || echo "No changes to commit"
+                        git add deployment.yaml
+                        git commit -m "Update image to ${IMAGE_TAG} [skip ci]" || echo "No changes to commit"
 
-                            # Push to deploy branch
-                            git push https://talashtests:${TOKEN}@github.com/talashtests/cicd-k3s-demo.git deploy
-                        """
-                    }
+                        git push https://talashtests:${TOKEN}@github.com/talashtests/cicd-k3s-demo.git deploy
+                    """
                 }
             }
         }
