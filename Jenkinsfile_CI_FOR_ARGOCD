@@ -58,7 +58,7 @@ pipeline {
                         git config user.name "jenkins"
 
                         git add deployment.yaml
-                        git commit -m "Update image to ${IMAGE_TAG}" || echo "No changes to commit"
+                        git commit -m "Update image to ${IMAGE_TAG} [skip ci]" || echo "No changes to commit"
 
                         git push https://talashtests:${TOKEN}@github.com/talashtests/cicd-k3s-demo.git HEAD:main
                     """
