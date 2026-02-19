@@ -1,0 +1,54 @@
+pipeline {
+    agent any
+    environment {
+        IMAGE_NAME = "ghcr.io/talashtests/cicd-k3s-demo"
+        IMAGE_TAG = "${env.BUILD_NUMBER}"
+    }
+    stages {
+        stage('Checkout') {
+            steps {
+                git credentialsId: 'github-creds', 
+                    url: 'https://github.com/talashtests/cicd-k3s-demo.git', 
+                    branch: 'main'
+            }
+        }
+        
+        stage('Prevent Loop') {
+            steps {
+                script {
+                    // Get the author of the last commit
+                    def author = sh(script: "git log -1 --pretty=format:'%an'", returnStdout: true).trim()
+                    echo "Last commit author: ${author}"
+                    
+                    // If Jenkins made the commit, stop the build gracefully
+                    if (author == "jenkins") {
+                        currentBuild.result = 'ABORTED'
+                        error("Stopping build: Loop detected (Commit made by Jenkins).")
+                    }
+                }
+            }
+        }
+
+        stage('Validate Python') {
+            steps {
+                sh 'python3 -m py_compile app.py'
+            }
+        }
+
+        // ... rest of your build/push/sed stages ...
+
+        stage('Commit and Push Changes') {
+            steps {
+                withCredentials([string(credentialsId: 'github-personal-access-token-classic', variable: 'TOKEN')]) {
+                    sh """
+                        git config user.email "jenkins@local"
+                        git config user.name "jenkins"
+                        git add deployment.yaml
+                        git commit -m "Update image to ${IMAGE_TAG} [skip ci]" || echo "No changes"
+                        git push https://talashtests:${TOKEN}@github.com/talashtests/cicd-k3s-demo.git HEAD:main
+                    """
+                }
+            }
+        }
+    }
+}
