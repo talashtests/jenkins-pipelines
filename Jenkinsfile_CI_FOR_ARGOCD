@@ -1,0 +1,69 @@
+pipeline {
+    agent any
+
+    environment {
+        IMAGE_NAME = "ghcr.io/talashtests/cicd-k3s-demo"
+        IMAGE_TAG  = "${env.BUILD_NUMBER}"
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                git credentialsId: 'github-creds',
+                    url: 'https://github.com/talashtests/cicd-k3s-demo.git',
+                    branch: 'main'
+            }
+        }
+
+        stage('Validate Python') {
+            steps {
+                sh 'python3 -m py_compile app.py'
+            }
+        }
+
+        stage('Build Image') {
+            steps {
+                sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} ."
+            }
+        }
+
+        stage('Login to GHCR') {
+            steps {
+                withCredentials([string(credentialsId: 'github-personal-access-token-classic', variable: 'TOKEN')]) {
+                    sh 'echo $TOKEN | docker login ghcr.io -u talashtests --password-stdin'
+                }
+            }
+        }
+
+        stage('Push Image') {
+            steps {
+                sh "docker push ${IMAGE_NAME}:${IMAGE_TAG}"
+            }
+        }
+
+        stage('Update Deployment Manifest') {
+            steps {
+                sh """
+                sed -i 's|image: ghcr.io/talashtests/cicd-k3s-demo:.*|image: ${IMAGE_NAME}:${IMAGE_TAG}|' deployment.yaml
+                """
+            }
+        }
+
+        stage('Commit and Push Changes') {
+            steps {
+                withCredentials([string(credentialsId: 'github-personal-access-token-classic', variable: 'TOKEN')]) {
+                    sh """
+                        git config user.email "jenkins@local"
+                        git config user.name "jenkins"
+
+                        git add deployment.yaml
+                        git commit -m "Update image to ${IMAGE_TAG}" || echo "No changes to commit"
+
+                        git push https://talashtests:${TOKEN}@github.com/talashtests/cicd-k3s-demo.git HEAD:main
+                    """
+                }
+            }
+        }
+    }
+}
