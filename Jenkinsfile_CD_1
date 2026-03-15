@@ -10,7 +10,7 @@ pipeline {
         }
         stage('Deploy to K3S') {
             steps {
-                withKubeConfig([credentialsId: 'K3S-kubeconfig-master']) {
+                withKubeConfig([credentialsId: 'K3S-kubeconfig_master']) {
                     sh 'kubectl apply -f deployment.yaml'
                     sh 'kubectl apply -f service.yaml'
                 }
