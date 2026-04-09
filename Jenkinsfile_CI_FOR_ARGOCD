@@ -48,16 +48,6 @@ pipeline {
             }
         }
 
-        stage('Prepare Updated Manifest') {
-            steps {
-                dir('main-repo') {
-                    sh """
-                        sed -i 's|image: ghcr.io/talashtests/cicd-k3s-demo:.*|image: ${IMAGE_NAME}:${IMAGE_TAG}|' deployment.yaml
-                    """
-                }
-            }
-        }
-
         stage('Checkout Deploy Branch') {
             steps {
                 dir('deploy-repo') {
@@ -71,18 +61,23 @@ pipeline {
         stage('Update Deploy Branch & Push') {
             steps {
                 withCredentials([string(credentialsId: 'github-personal-access-token-classic', variable: 'TOKEN')]) {
-                    sh """
-                        cp main-repo/deployment.yaml deploy-repo/deployment.yaml
+                    dir('deploy-repo') {
+                        sh """
+                            # Update image tag inside deployment.yaml
+                            sed -i 's|image: ghcr.io/talashtests/cicd-k3s-demo:.*|image: ${IMAGE_NAME}:${IMAGE_TAG}|' deployment.yaml
 
-                        cd deploy-repo
-                        git config user.email "jenkins@local"
-                        git config user.name "jenkins"
+                            # Git config
+                            git config user.email "jenkins@local"
+                            git config user.name "jenkins"
 
-                        git add deployment.yaml
-                        git commit -m "Update image to ${IMAGE_TAG} [skip ci]" || echo "No changes to commit"
+                            # Commit only if there are changes
+                            git add deployment.yaml
+                            git commit -m "Update image to ${IMAGE_TAG} [skip ci]" || echo "No changes to commit"
 
-                        git push https://talashtests:${TOKEN}@github.com/talashtests/cicd-k3s-demo.git deploy
-                    """
+                            # Push changes
+                            git push https://talashtests:${TOKEN}@github.com/talashtests/cicd-k3s-demo.git deploy
+                        """
+                    }
                 }
             }
         }
